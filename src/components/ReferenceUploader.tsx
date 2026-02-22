@@ -10,7 +10,6 @@ interface ReferenceUploaderProps {
   onChange: (references: ReferenceUpload[]) => void;
 }
 
-// Initialize OpenAI client for browser (requires NEXT_PUBLIC_OPENAI_API_KEY)
 const openai = new OpenAI({
   apiKey: process.env.NEXT_PUBLIC_OPENAI_API_KEY || '',
   dangerouslyAllowBrowser: true,
@@ -88,7 +87,6 @@ export function ReferenceUploader({ references, onChange }: ReferenceUploaderPro
   };
 
   const processFile = async (file: File) => {
-    // Check file size (max 5MB for Vision API performance)
     if (file.size > 5 * 1024 * 1024) {
       alert('File too large. Please use images under 5MB for best performance.');
       return;
@@ -114,7 +112,6 @@ export function ReferenceUploader({ references, onChange }: ReferenceUploaderPro
     const newReferences = [...references, newRef];
     onChange(newReferences);
 
-    // Auto-analyze if it's an image
     if (newRef.type === 'image' && process.env.NEXT_PUBLIC_OPENAI_API_KEY) {
       setAnalyzingId(newRef.id);
       try {
@@ -172,7 +169,6 @@ export function ReferenceUploader({ references, onChange }: ReferenceUploaderPro
 
   return (
     <div className="space-y-4">
-      {/* Error Message */}
       {analysisError && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-center gap-2 text-red-700 text-sm">
           <AlertCircle className="w-4 h-4 flex-shrink-0" />
@@ -180,7 +176,6 @@ export function ReferenceUploader({ references, onChange }: ReferenceUploaderPro
         </div>
       )}
 
-      {/* Upload Zone */}
       <div
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
@@ -213,7 +208,6 @@ export function ReferenceUploader({ references, onChange }: ReferenceUploaderPro
         </label>
       </div>
 
-      {/* Reference List */}
       {references.length > 0 && (
         <div className="space-y-3">
           <div className="flex items-center justify-between">
@@ -232,7 +226,6 @@ export function ReferenceUploader({ references, onChange }: ReferenceUploaderPro
                 className="bg-white border border-gray-200 rounded-xl p-4 hover:shadow-md transition-shadow"
               >
                 <div className="flex items-start gap-3">
-                  {/* Thumbnail */}
                   <div className="w-16 h-16 bg-gray-100 rounded-lg flex-shrink-0 overflow-hidden relative">
                     {ref.type === 'image' ? (
                       <>
@@ -254,7 +247,6 @@ export function ReferenceUploader({ references, onChange }: ReferenceUploaderPro
                     )}
                   </div>
 
-                  {/* Info */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-2">
                       <div>
@@ -288,7 +280,6 @@ export function ReferenceUploader({ references, onChange }: ReferenceUploaderPro
                   </div>
                 </div>
 
-                {/* Comment Section */}
                 <div className="mt-3 pt-3 border-t border-gray-100">
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2 text-xs text-gray-500">
@@ -296,7 +287,6 @@ export function ReferenceUploader({ references, onChange }: ReferenceUploaderPro
                       <span>AI Analysis / Your Notes</span>
                     </div>
                     
-                    {/* AI Analyze Button */}
                     {ref.type === 'image' && (
                       <button
                         onClick={() => handleAnalyze(ref)}
