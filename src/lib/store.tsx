@@ -161,7 +161,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const formatMJPrompt = (prompt: MJPrompt): string => {
     return `--------------------------------------------------------------------------------
 SHOT ${prompt.shotNumber}: ${prompt.shotDescription}
---------------------------------------------------------------------------------
 
 FIRST FRAME:
 ${prompt.firstFrame}
