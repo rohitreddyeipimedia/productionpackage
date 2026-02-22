@@ -9,13 +9,37 @@ export async function POST(req: NextRequest) {
   try {
     const { input, numShots } = await req.json();
 
-    const prompt = `You are a professional film production assistant. Create a complete production package for this screenplay.
+    // Build comprehensive visual context
+    let visualContext = 'No visual references provided.';
+    if (input.references && input.references.length > 0) {
+      visualContext = `USER UPLOADED REFERENCES:\n${input.references.map((ref: any, idx: number) => {
+        return `${idx + 1}. [${ref.category.toUpperCase()}] ${ref.fileName}
+   Context: "${ref.comment}"`;
+      }).join('\n')}`;
+    }
+
+    const visualNotes = input.visualStyleNotes || 'No additional visual notes.';
+
+    const prompt = `You are a professional film production assistant. Create a complete production package for this screenplay using the provided visual references.
 
 PROJECT DETAILS:
 - Title: ${input.title}
 - Duration: ${input.duration} seconds
 - Aspect Ratio: ${input.aspectRatio}
 - Number of Shots Needed: ${numShots} (calculated as 0.75 × duration)
+
+${visualContext}
+
+OVERALL VISUAL DIRECTION:
+${visualNotes}
+
+CRITICAL INSTRUCTIONS:
+You MUST incorporate the visual references into the production package:
+- CAST references define the exact look of characters
+- COSTUME references define what characters wear
+- ENVIRONMENT references define locations and settings
+- MOOD references define the cinematographic style
+- LIGHTING references define the lighting setup for all scenes
 
 SCREENPLAY:
 ${input.script}
@@ -33,8 +57,8 @@ Generate a complete production package with the following structure. Return as a
         "lens": "24mm/35mm/50mm/85mm/135mm",
         "movement": "Static/Pan/Tilt/Dolly/Track/etc",
         "duration": "2s",
-        "description": "Detailed shot description",
-        "lighting": "Lighting description"
+        "description": "Detailed shot description incorporating visual references",
+        "lighting": "Lighting description using lighting references"
       }
     ],
     "characters": [
@@ -42,20 +66,20 @@ Generate a complete production package with the following structure. Return as a
         "character": {
           "name": "Character Name",
           "ageRange": "30-40",
-          "look": "Description of appearance and personality",
-          "mjPortraitPrompt": "Detailed Midjourney portrait prompt"
+          "look": "Description using cast reference details",
+          "mjPortraitPrompt": "Detailed Midjourney portrait prompt with cast reference specifics"
         },
-        "outfit": "Description of clothing",
-        "materials": "Fabric materials",
-        "condition": "Condition of clothing"
+        "outfit": "Description using costume references",
+        "materials": "Fabric materials from references",
+        "condition": "Condition from references"
       }
     ],
     "environments": [
       {
-        "setting": "Setting name",
+        "setting": "Setting name using environment references",
         "timeOfDay": "Morning/Afternoon/Evening/Night",
-        "lightingSetup": "Lighting description",
-        "atmosphere": "Atmosphere description"
+        "lightingSetup": "Lighting using references",
+        "atmosphere": "Atmosphere using mood references"
       }
     ]
   },
@@ -63,11 +87,11 @@ Generate a complete production package with the following structure. Return as a
     {
       "shotNumber": 1,
       "shotDescription": "Brief description",
-      "firstFrame": "Detailed first frame description",
+      "firstFrame": "Detailed first frame description incorporating all reference details - min 80 words",
       "environment": {
         "country": "Country",
         "city": "City type",
-        "exactSetting": "Exact location",
+        "exactSetting": "Exact location from references",
         "timeOfDay": "Time",
         "weather": "Weather",
         "ambientDetails": "Ambient sounds and details"
@@ -75,24 +99,24 @@ Generate a complete production package with the following structure. Return as a
       "subject": {
         "primarySubject": "Human/Object",
         "name": "Name",
-        "ageRange": "Age range",
+        "ageRange": "Age range from cast ref",
         "gender": "Gender",
-        "ethnicity": "Ethnicity",
+        "ethnicity": "Ethnicity from cast ref",
         "skin": "Skin description",
-        "face": "Face description",
+        "face": "Face description from cast ref",
         "bodyType": "Body type"
       },
       "hair": {
-        "hairStyle": "Style",
+        "hairStyle": "Style from cast ref",
         "hairColor": "Color",
         "hairTexture": "Texture",
         "hairCondition": "Condition",
         "lightingOnHair": "How light hits hair"
       },
       "costume": {
-        "fullOutfitDescription": "Full outfit",
-        "colors": "Colors",
-        "materials": "Materials",
+        "fullOutfitDescription": "Full outfit from costume refs",
+        "colors": "Colors from refs",
+        "materials": "Materials from refs",
         "fit": "Fit",
         "condition": "Condition",
         "accessories": "Accessories"
@@ -104,8 +128,8 @@ Generate a complete production package with the following structure. Return as a
         "interaction": "Interaction"
       },
       "mood": {
-        "emotionalTone": "Emotional tone",
-        "atmosphere": "Atmosphere",
+        "emotionalTone": "Tone from mood refs",
+        "atmosphere": "Atmosphere from mood refs",
         "narrativeContext": "Context",
         "viewerFeeling": "Viewer feeling"
       },
@@ -115,14 +139,14 @@ Generate a complete production package with the following structure. Return as a
         "camera": "ARRI Alexa Mini LF",
         "focalLength": "Lens mm",
         "aperture": "f/stop",
-        "lightingSetup": "Lighting",
-        "colorGrading": "Color grading",
+        "lightingSetup": "Lighting from refs",
+        "colorGrading": "Color grading from mood refs",
         "filmGrain": "Subtle/None/Heavy",
         "aspectRatio": "${input.aspectRatio}"
       },
       "parameters": "--ar ${input.aspectRatio} --style raw --seed [unique seed]",
       "negatives": "cartoon, illustration, painting, CGI, plastic skin, beauty retouch, anime",
-      "fullPrompt": "Complete Midjourney prompt with all details and --ar ${input.aspectRatio} --style raw --seed [number] --no [negatives]"
+      "fullPrompt": "Complete Midjourney prompt with all reference details incorporated"
     }
   ]
 }
@@ -135,7 +159,7 @@ IMPORTANT:
 5. The fullPrompt field should contain the complete Midjourney command
 6. Use aspect ratio ${input.aspectRatio} in all prompts
 7. Each shot should have a unique seed number (12345, 12346, etc.)
-8. Include detailed character, environment, and costume packs based on the screenplay`;
+8. CRITICAL: Every description must incorporate details from the visual references provided`;
 
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o',
