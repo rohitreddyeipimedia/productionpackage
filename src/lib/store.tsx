@@ -271,7 +271,7 @@ Atmosphere: ${env.atmosphere}
         content += `
 --------------------------------------------------------------------------------
 SHOT ${prompt.shotNumber}: ${prompt.shotDescription}
---------------------------------------------------------------------------------
+
 
 FIRST FRAME:
 ${prompt.firstFrame}
