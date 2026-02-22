@@ -35,103 +35,109 @@ export function AppProvider({ children }: { children: ReactNode }) {
   });
 
   const submitInput = async (newInput: ProjectInput) => {
-    setState((prev) => ({ 
-      ...prev, 
-      isGenerating: true, 
-      error: null, 
+    setState((prev) => ({
+      ...prev,
+      isGenerating: true,
+      error: null,
       isComplete: false,
-      progressMessage: 'Generating shots...'
+      progressMessage: 'Initializing...',
     }));
-    
+
     try {
       const numShots = Math.round(newInput.duration * 0.75);
       const shotBatchSize = 10;
-      
+
       const allShots: Shot[] = [];
       const allCharacters: any[] = [];
       const allEnvironments: any[] = [];
-      
+
+      // Generate shots in batches
       for (let i = 0; i < numShots; i += shotBatchSize) {
         const batchNum = Math.floor(i / shotBatchSize) + 1;
         const totalBatches = Math.ceil(numShots / shotBatchSize);
         const shotsToGenerate = Math.min(shotBatchSize, numShots - i);
-        
-        setState((prev) => ({ 
-          ...prev, 
-          progressMessage: `Generating shots batch ${batchNum}/${totalBatches}...`
+
+        setState((prev) => ({
+          ...prev,
+          progressMessage: `Generating shots batch ${batchNum}/${totalBatches}...`,
         }));
-        
+
         const shotsResponse = await fetch('/api/generate-shots', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
+          body: JSON.stringify({
             input: newInput,
             numShots: shotsToGenerate,
             startIndex: i,
-            totalShots: numShots
+            totalShots: numShots,
+            references: newInput.references,
+            visualStyleNotes: newInput.visualStyleNotes,
           }),
         });
-        
+
         if (!shotsResponse.ok) {
           const errorData = await shotsResponse.json();
           throw new Error(errorData.error || `Failed to generate shots batch ${batchNum}`);
         }
-        
+
         const shotsData = await shotsResponse.json();
-        
+
         const batchShots = (shotsData.shots || []).map((s: any, idx: number) => ({
           ...s,
-          shotNumber: i + idx + 1
+          shotNumber: i + idx + 1,
         }));
-        
+
         allShots.push(...batchShots);
-        
+
         if (i === 0) {
           allCharacters.push(...(shotsData.characters || []));
           allEnvironments.push(...(shotsData.environments || []));
         }
-        
-        await new Promise(resolve => setTimeout(resolve, 300));
+
+        await new Promise((resolve) => setTimeout(resolve, 300));
       }
 
       if (allShots.length === 0) {
         throw new Error('No shots were generated');
       }
 
+      // Generate MJ prompts in batches
       const mjBatchSize = 3;
       const allMjPrompts: MJPrompt[] = [];
-      
+
       for (let i = 0; i < allShots.length; i += mjBatchSize) {
         const batch = allShots.slice(i, i + mjBatchSize);
         const batchNum = Math.floor(i / mjBatchSize) + 1;
         const totalBatches = Math.ceil(allShots.length / mjBatchSize);
-        
-        setState((prev) => ({ 
-          ...prev, 
-          progressMessage: `Generating MJ prompts batch ${batchNum}/${totalBatches}...`
+
+        setState((prev) => ({
+          ...prev,
+          progressMessage: `Generating MJ prompts batch ${batchNum}/${totalBatches}...`,
         }));
-        
+
         const mjResponse = await fetch('/api/generate-mj-prompts', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
+          body: JSON.stringify({
             shots: batch,
             characters: allCharacters,
             environments: allEnvironments,
             input: newInput,
-            startIndex: i
+            startIndex: i,
+            references: newInput.references,
+            visualStyleNotes: newInput.visualStyleNotes,
           }),
         });
-        
+
         if (!mjResponse.ok) {
           const errorData = await mjResponse.json();
           throw new Error(errorData.error || `Failed to generate MJ prompts batch ${batchNum}`);
         }
-        
+
         const mjData = await mjResponse.json();
         allMjPrompts.push(...(mjData.mjPrompts || []));
-        
-        await new Promise(resolve => setTimeout(resolve, 500));
+
+        await new Promise((resolve) => setTimeout(resolve, 500));
       }
 
       setState({
@@ -158,9 +164,124 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const formatMJPrompt = (prompt: MJPrompt): string => {
-    return `--------------------------------------------------------------------------------
+  const generatePackageContent = (): string => {
+    if (!state.package || !state.input) return '';
+
+    const { input, package: pkg } = state;
+    const date = new Date().toLocaleDateString();
+
+    let content = `================================================================================
+ COMPLETE PRODUCTION PACKAGE
+================================================================================
+
+PROJECT: ${input.title}
+DIRECTOR: ${input.director || 'N/A'}
+CINEMATOGRAPHER: ${input.cinematographer || 'N/A'}
+DURATION: ${input.duration} seconds
+ASPECT RATIO: ${input.aspectRatio}
+DATE: ${date}
+
+================================================================================
+ VISUAL REFERENCES
+================================================================================
+
+Total References: ${input.references?.length || 0}
+${input.visualStyleNotes ? `Visual Direction: ${input.visualStyleNotes}` : ''}
+
+${input.references?.map((ref, idx) => `
+Reference ${idx + 1}: ${ref.fileName}
+Category: ${ref.category}
+Context: ${ref.comment}
+Type: ${ref.type}
+`).join('\n') || 'No visual references uploaded'}
+
+================================================================================
+ ORIGINAL SCRIPT
+================================================================================
+
+${input.script}
+
+================================================================================
+ SHOT BREAKDOWN (${pkg.shots.length} SHOTS)
+================================================================================
+
+`;
+    pkg.shots.forEach((shot) => {
+      content += `
+SHOT ${shot.shotNumber}
+Timestamp: ${shot.timestamp}
+Framing: ${shot.framing}
+Lens: ${shot.lens}
+Movement: ${shot.movement}
+Duration: ${shot.duration}
+Description: ${shot.description}
+Lighting: ${shot.lighting}
+
+`;
+    });
+
+    if (pkg.characters && pkg.characters.length > 0) {
+      content += `================================================================================
+ CHARACTER PACKS
+================================================================================
+
+`;
+      pkg.characters.forEach((char) => {
+        content += `
+CHARACTER: ${char.character.name}
+Age Range: ${char.character.ageRange}
+Look: ${char.character.look}
+MJ Portrait Prompt: ${char.character.mjPortraitPrompt}
+
+`;
+      });
+    }
+
+    if (pkg.environments && pkg.environments.length > 0) {
+      content += `================================================================================
+ ENVIRONMENT PACKS
+================================================================================
+
+`;
+      pkg.environments.forEach((env) => {
+        content += `
+SETTING: ${env.setting}
+Time of Day: ${env.timeOfDay}
+Lighting Setup: ${env.lightingSetup}
+Atmosphere: ${env.atmosphere}
+
+`;
+      });
+    }
+
+    if (pkg.characters && pkg.characters.length > 0) {
+      content += `================================================================================
+ COSTUME PACKS
+================================================================================
+
+`;
+      pkg.characters.forEach((char) => {
+        content += `
+CHARACTER: ${char.character.name}
+Outfit: ${char.outfit}
+Materials: ${char.materials}
+Condition: ${char.condition}
+
+`;
+      });
+    }
+
+    if (state.mjPrompts && state.mjPrompts.length > 0) {
+      content += `================================================================================
+ MIDJOURNEY PROMPTS (${state.mjPrompts.length} PROMPTS)
+================================================================================
+
+`;
+      state.mjPrompts.forEach((prompt) => {
+        content += `
+--------------------------------------------------------------------------------
 SHOT ${prompt.shotNumber}: ${prompt.shotDescription}
+--------------------------------------------------------------------------------
 
 FIRST FRAME:
 ${prompt.firstFrame}
@@ -220,10 +341,22 @@ Lighting setup: ${prompt.cinematography.lightingSetup}
 Color grading: ${prompt.cinematography.colorGrading}
 Film grain: ${prompt.cinematography.filmGrain}
 Aspect ratio: ${prompt.cinematography.aspectRatio}
+
+FULL PROMPT:
 ${prompt.fullPrompt}
 
 PARAMETERS: ${prompt.parameters}
-NEGATIVES: ${prompt.negatives}`;
+NEGATIVES: ${prompt.negatives}
+
+`;
+      });
+    }
+
+    content += `================================================================================
+ END OF PACKAGE
+================================================================================`;
+
+    return content;
   };
 
   const downloadTxt = () => {
@@ -231,10 +364,10 @@ NEGATIVES: ${prompt.negatives}`;
       alert('No MJ prompts to download');
       return;
     }
-    
-    // Generate full detailed MJ prompts with all sections using formatMJPrompt
-    const content = state.mjPrompts.map((p) => formatMJPrompt(p)).join('\n\n\n');
-    
+
+    const content = state.mjPrompts
+      .map((p) => p.fullPrompt)
+      .join('\n\n================================================================================\n\n');
     const blob = new Blob([content], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -251,10 +384,10 @@ NEGATIVES: ${prompt.negatives}`;
       alert('No shots to download');
       return;
     }
-    
+
     let content = `SHOT LIST - ${state.input?.title || 'Untitled'}\n`;
     content += `Duration: ${state.input?.duration}s | Aspect Ratio: ${state.input?.aspectRatio}\n\n`;
-    
+
     state.package.shots.forEach((shot) => {
       content += `SHOT ${shot.shotNumber}\n`;
       content += `Timestamp: ${shot.timestamp} | Duration: ${shot.duration}\n`;
@@ -262,7 +395,7 @@ NEGATIVES: ${prompt.negatives}`;
       content += `Description: ${shot.description}\n`;
       content += `Lighting: ${shot.lighting}\n\n`;
     });
-    
+
     const blob = new Blob([content], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -275,113 +408,12 @@ NEGATIVES: ${prompt.negatives}`;
   };
 
   const downloadCompletePackage = () => {
-    if (!state.package || !state.input) return;
-    
-    const { input, package: pkg } = state;
-    const date = new Date().toLocaleDateString();
-    
-    let content = `================================================================================
-                    COMPLETE PRODUCTION PACKAGE
-================================================================================
-
-PROJECT: ${input.title}
-DURATION: ${input.duration} seconds
-ASPECT RATIO: ${input.aspectRatio}
-DATE: ${date}
-
-================================================================================
-                              ORIGINAL SCRIPT
-================================================================================
-
-${input.script}
-
-================================================================================
-                         SHOT BREAKDOWN (${pkg.shots.length} SHOTS)
-================================================================================
-
-`;
-    
-    pkg.shots.forEach((shot) => {
-      content += `
-SHOT ${shot.shotNumber}
-Timestamp: ${shot.timestamp}
-Framing: ${shot.framing}
-Lens: ${shot.lens}
-Movement: ${shot.movement}
-Duration: ${shot.duration}
-Description: ${shot.description}
-Lighting: ${shot.lighting}
-
-`;
-    });
-
-    if (pkg.characters && pkg.characters.length > 0) {
-      content += `================================================================================
-                         CHARACTER PACKS
-================================================================================
-
-`;
-      pkg.characters.forEach((char) => {
-        content += `
-CHARACTER: ${char.character.name}
-Age Range: ${char.character.ageRange}
-Look: ${char.character.look}
-MJ Portrait Prompt: ${char.character.mjPortraitPrompt}
-
-`;
-      });
+    const content = generatePackageContent();
+    if (!content) {
+      alert('No data to download');
+      return;
     }
 
-    if (pkg.environments && pkg.environments.length > 0) {
-      content += `================================================================================
-                         ENVIRONMENT PACKS
-================================================================================
-
-`;
-      pkg.environments.forEach((env) => {
-        content += `
-SETTING: ${env.setting}
-Time of Day: ${env.timeOfDay}
-Lighting Setup: ${env.lightingSetup}
-Atmosphere: ${env.atmosphere}
-
-`;
-      });
-    }
-
-    if (pkg.characters && pkg.characters.length > 0) {
-      content += `================================================================================
-                         COSTUME PACKS
-================================================================================
-
-`;
-      pkg.characters.forEach((char) => {
-        content += `
-CHARACTER: ${char.character.name}
-Outfit: ${char.outfit}
-Materials: ${char.materials}
-Condition: ${char.condition}
-
-`;
-      });
-    }
-
-    if (state.mjPrompts && state.mjPrompts.length > 0) {
-      content += `================================================================================
-                      MIDJOURNEY PROMPTS (${state.mjPrompts.length} PROMPTS)
-================================================================================
-
-`;
-      content += state.mjPrompts.map((p) => formatMJPrompt(p)).join('\n\n\n');
-    }
-
-    content += `
-
-================================================================================
-                              END OF PACKAGE
-================================================================================
-`;
-    
     const blob = new Blob([content], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
