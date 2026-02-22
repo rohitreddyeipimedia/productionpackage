@@ -233,7 +233,7 @@ NEGATIVES: ${prompt.negatives}`;
       return;
     }
     
-    // Generate full detailed MJ prompts with all sections
+    // Generate full detailed MJ prompts with all sections using formatMJPrompt
     const content = state.mjPrompts.map((p) => formatMJPrompt(p)).join('\n\n\n');
     
     const blob = new Blob([content], { type: 'text/plain' });
