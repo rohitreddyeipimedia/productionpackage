@@ -57,7 +57,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
       });
       if (!page2Res.ok) throw new Error('Failed to generate shots');
       const shotsData = await page2Res.json();
-      const shots = Array.isArray(shotsData) ? shotsData : shotsData.shots || [];
+      console.log('Shots API response:', shotsData);
+      
+      // Handle different response formats
+      let shots: Shot[] = [];
+      if (Array.isArray(shotsData)) {
+        shots = shotsData;
+      } else if (shotsData.shots && Array.isArray(shotsData.shots)) {
+        shots = shotsData.shots;
+      } else if (typeof shotsData === 'object') {
+        // Try to find array in response
+        const possibleArray = Object.values(shotsData).find(v => Array.isArray(v));
+        if (possibleArray) shots = possibleArray as Shot[];
+      }
 
       // Step 3: Generate packs
       const page3Res = await fetch('/api/page3', {
@@ -66,7 +78,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
         body: JSON.stringify({ shots, input: newInput }),
       });
       if (!page3Res.ok) throw new Error('Failed to generate packs');
-      const packs = await page3Res.json();
+      const packsData = await page3Res.json();
+      console.log('Packs API response:', packsData);
+      
+      // Handle packs response
+      let packs: Packs = { shots: shots, packs: [] };
+      if (packsData && typeof packsData === 'object') {
+        if (packsData.packs && Array.isArray(packsData.packs)) {
+          packs = packsData;
+        } else if (Array.isArray(packsData)) {
+          packs = { shots: shots, packs: packsData };
+        }
+      }
 
       // Step 4: Generate MJ prompts
       const page4Res = await fetch('/api/page4', {
@@ -76,9 +99,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
       });
       if (!page4Res.ok) throw new Error('Failed to generate MJ prompts');
       const mjData = await page4Res.json();
-      const mjPrompts = Array.isArray(mjData) ? mjData : mjData.prompts || [];
+      console.log('MJ Prompts API response:', mjData);
+      
+      // Handle MJ prompts response
+      let mjPrompts: MJPrompt[] = [];
+      if (Array.isArray(mjData)) {
+        mjPrompts = mjData;
+      } else if (mjData.prompts && Array.isArray(mjData.prompts)) {
+        mjPrompts = mjData.prompts;
+      } else if (mjData.mjPrompts && Array.isArray(mjData.mjPrompts)) {
+        mjPrompts = mjData.mjPrompts;
+      } else if (typeof mjData === 'object') {
+        const possibleArray = Object.values(mjData).find(v => Array.isArray(v));
+        if (possibleArray) mjPrompts = possibleArray as MJPrompt[];
+      }
 
-      console.log('Generation complete!', { shots, packs, mjPrompts });
+      console.log('Final data:', { shotsCount: shots.length, packsCount: packs.packs.length, mjCount: mjPrompts.length });
 
       setState({
         input: newInput,
@@ -101,70 +137,89 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   const downloadTxt = () => {
-    if (!state.mjPrompts.length) return;
+    if (!state.mjPrompts || state.mjPrompts.length === 0) {
+      alert('No MJ prompts to download');
+      return;
+    }
     const content = state.mjPrompts.map((p) => p.prompt).join('\n\n---\n\n');
     const blob = new Blob([content], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
     a.download = `${state.input?.title || 'project'}_mj_prompts.txt`;
+    document.body.appendChild(a);
     a.click();
+    document.body.removeChild(a);
     URL.revokeObjectURL(url);
   };
 
   const downloadDoc = () => {
-    if (!state.mjPrompts.length) return;
+    if (!state.mjPrompts || state.mjPrompts.length === 0) {
+      alert('No MJ prompts to download');
+      return;
+    }
     const content = state.mjPrompts.map((p, i) => `Shot ${i + 1}: ${p.shotName}\n\n${p.prompt}\n\n`).join('---\n\n');
     const blob = new Blob([content], { type: 'application/msword' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
     a.download = `${state.input?.title || 'project'}_mj_prompts.doc`;
+    document.body.appendChild(a);
     a.click();
+    document.body.removeChild(a);
     URL.revokeObjectURL(url);
   };
 
   const downloadCompletePackage = () => {
-    if (!state.packs) return;
+    if (!state.packs || !state.shots.length) {
+      alert('No data to download');
+      return;
+    }
     
     let content = `PRODUCTION PACKAGE\n`;
     content += `==================\n\n`;
-    content += `Title: ${state.input?.title}\n`;
-    content += `Director: ${state.input?.director}\n`;
-    content += `Cinematographer: ${state.input?.cinematographer}\n\n`;
+    content += `Title: ${state.input?.title || 'Untitled'}\n`;
+    content += `Director: ${state.input?.director || 'TBD'}\n`;
+    content += `Cinematographer: ${state.input?.cinematographer || 'TBD'}\n\n`;
     
-    content += `SHOTS\n`;
+    content += `SHOTS (${state.shots.length})\n`;
     content += `=====\n\n`;
-    state.packs.shots.forEach((shot: any, i: number) => {
-      content += `${i + 1}. ${shot.name}\n`;
-      content += `   Location: ${shot.location}\n`;
-      content += `   Characters: ${shot.characters.join(', ')}\n`;
-      content += `   Time: ${shot.timeOfDay}\n`;
-      content += `   Description: ${shot.description}\n\n`;
+    state.shots.forEach((shot, i) => {
+      content += `${i + 1}. ${shot.name || 'Unnamed Shot'}\n`;
+      content += `   Location: ${shot.location || 'N/A'}\n`;
+      content += `   Characters: ${shot.characters?.join(', ') || 'N/A'}\n`;
+      content += `   Time: ${shot.timeOfDay || 'N/A'}\n`;
+      content += `   Description: ${shot.description || 'N/A'}\n\n`;
     });
 
-    content += `\nPRODUCTION PACKS\n`;
-    content += `================\n\n`;
-    state.packs.packs.forEach((pack: any, i: number) => {
-      content += `Pack ${i + 1}: ${pack.name}\n`;
-      content += `Shots: ${pack.shots.join(', ')}\n`;
-      content += `Location: ${pack.location}\n`;
-      content += `Requirements: ${pack.requirements.join(', ')}\n\n`;
-    });
+    if (state.packs.packs && state.packs.packs.length > 0) {
+      content += `\nPRODUCTION PACKS (${state.packs.packs.length})\n`;
+      content += `================\n\n`;
+      state.packs.packs.forEach((pack, i) => {
+        content += `Pack ${i + 1}: ${pack.name || 'Unnamed Pack'}\n`;
+        content += `Shots: ${pack.shots?.join(', ') || 'N/A'}\n`;
+        content += `Location: ${pack.location || 'N/A'}\n`;
+        content += `Requirements: ${pack.requirements?.join(', ') || 'N/A'}\n\n`;
+      });
+    }
 
-    content += `\nMIDJOURNEY PROMPTS\n`;
-    content += `==================\n\n`;
-    state.mjPrompts.forEach((prompt: MJPrompt, i: number) => {
-      content += `Shot ${i + 1}: ${prompt.shotName}\n`;
-      content += `${prompt.prompt}\n\n`;
-    });
+    if (state.mjPrompts.length > 0) {
+      content += `\nMIDJOURNEY PROMPTS (${state.mjPrompts.length})\n`;
+      content += `==================\n\n`;
+      state.mjPrompts.forEach((prompt, i) => {
+        content += `Shot ${i + 1}: ${prompt.shotName || 'Unnamed'}\n`;
+        content += `${prompt.prompt || 'No prompt'}\n\n`;
+      });
+    }
 
     const blob = new Blob([content], { type: 'application/msword' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
     a.download = `${state.input?.title || 'project'}_complete_package.doc`;
+    document.body.appendChild(a);
     a.click();
+    document.body.removeChild(a);
     URL.revokeObjectURL(url);
   };
 
