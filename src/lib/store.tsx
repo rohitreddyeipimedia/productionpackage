@@ -158,8 +158,125 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const generatePackageContent = (): string => {
-    if (!state.package || !state.input) return '';
+  const formatMJPrompt = (prompt: MJPrompt): string => {
+    return `--------------------------------------------------------------------------------
+SHOT ${prompt.shotNumber}: ${prompt.shotDescription}
+--------------------------------------------------------------------------------
+
+FIRST FRAME:
+${prompt.firstFrame}
+
+ENVIRONMENT:
+Country: ${prompt.environment.country}
+City: ${prompt.environment.city}
+Exact setting: ${prompt.environment.exactSetting}
+Time of day: ${prompt.environment.timeOfDay}
+Weather: ${prompt.environment.weather}
+Ambient details: ${prompt.environment.ambientDetails}
+
+SUBJECT:
+Primary subject: ${prompt.subject.primarySubject}
+Name: ${prompt.subject.name}
+Age range: ${prompt.subject.ageRange}
+Gender: ${prompt.subject.gender}
+Ethnicity: ${prompt.subject.ethnicity}
+Skin: ${prompt.subject.skin}
+Face: ${prompt.subject.face}
+Body type: ${prompt.subject.bodyType}
+
+HAIR:
+Hair style: ${prompt.hair.hairStyle}
+Hair color: ${prompt.hair.hairColor}
+Hair texture: ${prompt.hair.hairTexture}
+Hair condition: ${prompt.hair.hairCondition}
+Lighting on hair: ${prompt.hair.lightingOnHair}
+
+COSTUME:
+Full outfit description: ${prompt.costume.fullOutfitDescription}
+Colors: ${prompt.costume.colors}
+Materials: ${prompt.costume.materials}
+Fit: ${prompt.costume.fit}
+Condition: ${prompt.costume.condition}
+Accessories: ${prompt.costume.accessories}
+
+ACTION:
+Primary action: ${prompt.action.primaryAction}
+Body language: ${prompt.action.bodyLanguage}
+Micro-expressions: ${prompt.action.microExpressions}
+Interaction: ${prompt.action.interaction}
+
+MOOD:
+Emotional tone: ${prompt.mood.emotionalTone}
+Atmosphere: ${prompt.mood.atmosphere}
+Narrative context: ${prompt.mood.narrativeContext}
+Viewer feeling: ${prompt.mood.viewerFeeling}
+
+CINEMATOGRAPHY:
+DoP inspired by: ${prompt.cinematography.dopInspiredBy}
+Style: ${prompt.cinematography.style}
+Camera: ${prompt.cinematography.camera}
+Focal length: ${prompt.cinematography.focalLength}
+Aperture: ${prompt.cinematography.aperture}
+Lighting setup: ${prompt.cinematography.lightingSetup}
+Color grading: ${prompt.cinematography.colorGrading}
+Film grain: ${prompt.cinematography.filmGrain}
+Aspect ratio: ${prompt.cinematography.aspectRatio}
+${prompt.fullPrompt}
+
+PARAMETERS: ${prompt.parameters}
+NEGATIVES: ${prompt.negatives}`;
+  };
+
+  const downloadTxt = () => {
+    if (!state.mjPrompts || state.mjPrompts.length === 0) {
+      alert('No MJ prompts to download');
+      return;
+    }
+    
+    // Generate full detailed MJ prompts with all sections
+    const content = state.mjPrompts.map((p) => formatMJPrompt(p)).join('\n\n\n');
+    
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${state.input?.title || 'project'}_mj_prompts.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const downloadDoc = () => {
+    if (!state.package || state.package.shots.length === 0) {
+      alert('No shots to download');
+      return;
+    }
+    
+    let content = `SHOT LIST - ${state.input?.title || 'Untitled'}\n`;
+    content += `Duration: ${state.input?.duration}s | Aspect Ratio: ${state.input?.aspectRatio}\n\n`;
+    
+    state.package.shots.forEach((shot) => {
+      content += `SHOT ${shot.shotNumber}\n`;
+      content += `Timestamp: ${shot.timestamp} | Duration: ${shot.duration}\n`;
+      content += `Framing: ${shot.framing} | Lens: ${shot.lens} | Movement: ${shot.movement}\n`;
+      content += `Description: ${shot.description}\n`;
+      content += `Lighting: ${shot.lighting}\n\n`;
+    });
+    
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${state.input?.title || 'project'}_shot_list.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const downloadCompletePackage = () => {
+    if (!state.package || !state.input) return;
     
     const { input, package: pkg } = state;
     const date = new Date().toLocaleDateString();
@@ -256,140 +373,15 @@ Condition: ${char.condition}
 ================================================================================
 
 `;
-      state.mjPrompts.forEach((prompt) => {
-        content += `
---------------------------------------------------------------------------------
-SHOT ${prompt.shotNumber}: ${prompt.shotDescription}
---------------------------------------------------------------------------------
-
-FIRST FRAME:
-${prompt.firstFrame}
-
-ENVIRONMENT:
-Country: ${prompt.environment.country}
-City: ${prompt.environment.city}
-Exact setting: ${prompt.environment.exactSetting}
-Time of day: ${prompt.environment.timeOfDay}
-Weather: ${prompt.environment.weather}
-Ambient details: ${prompt.environment.ambientDetails}
-
-SUBJECT:
-Primary subject: ${prompt.subject.primarySubject}
-Name: ${prompt.subject.name}
-Age range: ${prompt.subject.ageRange}
-Gender: ${prompt.subject.gender}
-Ethnicity: ${prompt.subject.ethnicity}
-Skin: ${prompt.subject.skin}
-Face: ${prompt.subject.face}
-Body type: ${prompt.subject.bodyType}
-
-HAIR:
-Hair style: ${prompt.hair.hairStyle}
-Hair color: ${prompt.hair.hairColor}
-Hair texture: ${prompt.hair.hairTexture}
-Hair condition: ${prompt.hair.hairCondition}
-Lighting on hair: ${prompt.hair.lightingOnHair}
-
-COSTUME:
-Full outfit description: ${prompt.costume.fullOutfitDescription}
-Colors: ${prompt.costume.colors}
-Materials: ${prompt.costume.materials}
-Fit: ${prompt.costume.fit}
-Condition: ${prompt.costume.condition}
-Accessories: ${prompt.costume.accessories}
-
-ACTION:
-Primary action: ${prompt.action.primaryAction}
-Body language: ${prompt.action.bodyLanguage}
-Micro-expressions: ${prompt.action.microExpressions}
-Interaction: ${prompt.action.interaction}
-
-MOOD:
-Emotional tone: ${prompt.mood.emotionalTone}
-Atmosphere: ${prompt.mood.atmosphere}
-Narrative context: ${prompt.mood.narrativeContext}
-Viewer feeling: ${prompt.mood.viewerFeeling}
-
-CINEMATOGRAPHY:
-DoP inspired by: ${prompt.cinematography.dopInspiredBy}
-Style: ${prompt.cinematography.style}
-Camera: ${prompt.cinematography.camera}
-Focal length: ${prompt.cinematography.focalLength}
-Aperture: ${prompt.cinematography.aperture}
-Lighting setup: ${prompt.cinematography.lightingSetup}
-Color grading: ${prompt.cinematography.colorGrading}
-Film grain: ${prompt.cinematography.filmGrain}
-Aspect ratio: ${prompt.cinematography.aspectRatio}
-${prompt.fullPrompt}
-
-PARAMETERS: ${prompt.parameters}
-NEGATIVES: ${prompt.negatives}
-
-
-`;
-      });
+      content += state.mjPrompts.map((p) => formatMJPrompt(p)).join('\n\n\n');
     }
 
-    content += `================================================================================
+    content += `
+
+================================================================================
                               END OF PACKAGE
 ================================================================================
 `;
-    
-    return content;
-  };
-
-  const downloadTxt = () => {
-    if (!state.mjPrompts || state.mjPrompts.length === 0) {
-      alert('No MJ prompts to download');
-      return;
-    }
-    
-    const content = state.mjPrompts.map((p) => p.fullPrompt).join('\n\n================================================================================\n\n');
-    const blob = new Blob([content], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${state.input?.title || 'project'}_mj_prompts.txt`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  };
-
-  const downloadDoc = () => {
-    if (!state.package || state.package.shots.length === 0) {
-      alert('No shots to download');
-      return;
-    }
-    
-    let content = `SHOT LIST - ${state.input?.title || 'Untitled'}\n`;
-    content += `Duration: ${state.input?.duration}s | Aspect Ratio: ${state.input?.aspectRatio}\n\n`;
-    
-    state.package.shots.forEach((shot) => {
-      content += `SHOT ${shot.shotNumber}\n`;
-      content += `Timestamp: ${shot.timestamp} | Duration: ${shot.duration}\n`;
-      content += `Framing: ${shot.framing} | Lens: ${shot.lens} | Movement: ${shot.movement}\n`;
-      content += `Description: ${shot.description}\n`;
-      content += `Lighting: ${shot.lighting}\n\n`;
-    });
-    
-    const blob = new Blob([content], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${state.input?.title || 'project'}_shot_list.txt`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  };
-
-  const downloadCompletePackage = () => {
-    const content = generatePackageContent();
-    if (!content) {
-      alert('No data to download');
-      return;
-    }
     
     const blob = new Blob([content], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
