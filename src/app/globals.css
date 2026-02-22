@@ -3,6 +3,19 @@
 @tailwind utilities;
 
 body {
-  background: #0f172a;
-  color: white;
+  background: #ffffff;
+  color: #1d1d1f;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Inter', 'Helvetica Neue', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Apple-style selection */
+::selection {
+  background: rgba(175, 82, 222, 0.2);
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
 }
