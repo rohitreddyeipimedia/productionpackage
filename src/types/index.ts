@@ -2,8 +2,8 @@ export interface ProjectInput {
   title: string;
   director: string;
   cinematographer: string;
-  duration: number; // in seconds
-  aspectRatio: string; // 16:9, 9:16, 1:1, etc.
+  duration: number;
+  aspectRatio: string;
   script: string;
 }
 
@@ -109,5 +109,4 @@ export interface ProductionPackage {
   shots: Shot[];
   characters: CharacterPack[];
   environments: EnvironmentPack[];
-  mjPrompts: MJPrompt[];
 }
