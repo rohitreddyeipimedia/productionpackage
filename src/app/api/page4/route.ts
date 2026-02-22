@@ -21,14 +21,16 @@ For each shot, create a detailed Midjourney prompt with:
 - Mood and atmosphere
 - Aspect ratio (16:9)
 
-Return as JSON array:
-[
-  {
-    "shotId": "shot-id",
-    "shotName": "Wide shot of house",
-    "prompt": "cinematic wide shot of Victorian house exterior, golden hour lighting, 35mm film look, atmospheric, moody, --ar 16:9 --v 6"
-  }
-]`;
+Return as JSON object with "prompts" array:
+{
+  "prompts": [
+    {
+      "shotId": "shot-id",
+      "shotName": "Wide shot of house",
+      "prompt": "cinematic wide shot of Victorian house exterior, golden hour lighting, 35mm film look, atmospheric, moody, --ar 16:9 --v 6"
+    }
+  ]
+}`;
 
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o',
@@ -37,10 +39,17 @@ Return as JSON array:
     });
 
     const content = completion.choices[0].message.content;
-    const parsed = JSON.parse(content || '[]');
-    const mjPrompts = Array.isArray(parsed) ? parsed : parsed.prompts || [];
+    const parsed = JSON.parse(content || '{}');
+    
+    // Extract prompts array from response
+    let prompts: any[] = [];
+    if (parsed.prompts && Array.isArray(parsed.prompts)) {
+      prompts = parsed.prompts;
+    } else if (Array.isArray(parsed)) {
+      prompts = parsed;
+    }
 
-    return NextResponse.json(mjPrompts);
+    return NextResponse.json({ prompts });
   } catch (error: any) {
     console.error('Page 4 error:', error);
     return NextResponse.json(
