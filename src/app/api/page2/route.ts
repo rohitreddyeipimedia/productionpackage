@@ -25,19 +25,21 @@ Generate shots with:
 - Camera angles and movements
 - Character actions
 
-Return as JSON array with this structure:
-[
-  {
-    "id": "unique-id",
-    "sceneNumber": 1,
-    "shotNumber": 1,
-    "name": "Wide shot of house exterior",
-    "description": "Camera pans across the facade",
-    "location": "EXT. HOUSE - DAY",
-    "characters": ["CHARACTER"],
-    "timeOfDay": "DAY"
-  }
-]`;
+Return as JSON object with "shots" array:
+{
+  "shots": [
+    {
+      "id": "unique-id",
+      "sceneNumber": 1,
+      "shotNumber": 1,
+      "name": "Wide shot of house exterior",
+      "description": "Camera pans across the facade",
+      "location": "EXT. HOUSE - DAY",
+      "characters": ["CHARACTER"],
+      "timeOfDay": "DAY"
+    }
+  ]
+}`;
 
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o',
@@ -46,15 +48,22 @@ Return as JSON array with this structure:
     });
 
     const content = completion.choices[0].message.content;
-    const parsed = JSON.parse(content || '[]');
-    const shots = Array.isArray(parsed) ? parsed : parsed.shots || [];
+    const parsed = JSON.parse(content || '{}');
+    
+    // Extract shots array from response
+    let shots: any[] = [];
+    if (parsed.shots && Array.isArray(parsed.shots)) {
+      shots = parsed.shots;
+    } else if (Array.isArray(parsed)) {
+      shots = parsed;
+    }
 
     const shotsWithIds = shots.map((shot: any) => ({
       ...shot,
       id: shot.id || generateUUID(),
     }));
 
-    return NextResponse.json(shotsWithIds);
+    return NextResponse.json({ shots: shotsWithIds });
   } catch (error: any) {
     console.error('Page 2 error:', error);
     return NextResponse.json(
