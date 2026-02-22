@@ -45,9 +45,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     
     try {
       const numShots = Math.round(newInput.duration * 0.75);
-      const shotBatchSize = 10; // Generate shots in batches of 10
+      const shotBatchSize = 10;
       
-      // Step 1: Generate shots in batches
       const allShots: Shot[] = [];
       const allCharacters: any[] = [];
       const allEnvironments: any[] = [];
@@ -80,7 +79,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
         
         const shotsData = await shotsResponse.json();
         
-        // Adjust shot numbers to be sequential
         const batchShots = (shotsData.shots || []).map((s: any, idx: number) => ({
           ...s,
           shotNumber: i + idx + 1
@@ -88,13 +86,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
         
         allShots.push(...batchShots);
         
-        // Only take characters and environments from first batch
         if (i === 0) {
           allCharacters.push(...(shotsData.characters || []));
           allEnvironments.push(...(shotsData.environments || []));
         }
         
-        // Small delay between batches
         await new Promise(resolve => setTimeout(resolve, 300));
       }
 
@@ -102,7 +98,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
         throw new Error('No shots were generated');
       }
 
-      // Step 2: Generate MJ prompts in batches of 3
       const mjBatchSize = 3;
       const allMjPrompts: MJPrompt[] = [];
       
@@ -136,11 +131,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const mjData = await mjResponse.json();
         allMjPrompts.push(...(mjData.mjPrompts || []));
         
-        // Small delay to avoid rate limiting
         await new Promise(resolve => setTimeout(resolve, 500));
       }
-
-      console.log('All generated:', { shots: allShots.length, mjPrompts: allMjPrompts.length });
 
       setState({
         input: newInput,
@@ -207,7 +199,6 @@ Lighting: ${shot.lighting}
 `;
     });
 
-    // Character Packs
     if (pkg.characters && pkg.characters.length > 0) {
       content += `================================================================================
                          CHARACTER PACKS
@@ -225,7 +216,6 @@ MJ Portrait Prompt: ${char.character.mjPortraitPrompt}
       });
     }
 
-    // Environment Packs
     if (pkg.environments && pkg.environments.length > 0) {
       content += `================================================================================
                          ENVIRONMENT PACKS
@@ -243,7 +233,6 @@ Atmosphere: ${env.atmosphere}
       });
     }
 
-    // Costume Packs
     if (pkg.characters && pkg.characters.length > 0) {
       content += `================================================================================
                          COSTUME PACKS
@@ -261,7 +250,6 @@ Condition: ${char.condition}
       });
     }
 
-    // MJ Prompts
     if (state.mjPrompts && state.mjPrompts.length > 0) {
       content += `================================================================================
                       MIDJOURNEY PROMPTS (${state.mjPrompts.length} PROMPTS)
@@ -444,4 +432,6 @@ NEGATIVES: ${prompt.negatives}
 
 export const useApp = () => {
   const context = useContext(AppContext);
-  if (!context) throw new Error('useApp must be used within App
+  if (!context) throw new Error('useApp must be used within AppProvider');
+  return context;
+};
