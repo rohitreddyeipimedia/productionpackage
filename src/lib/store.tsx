@@ -1,13 +1,11 @@
 'use client';
 
 import React, { createContext, useContext, useState, ReactNode } from 'react';
-import { ProjectInput, Shot, Packs, MJPrompt } from '@/types';
+import { ProjectInput, ProductionPackage, MJPrompt } from '@/types';
 
 interface AppState {
   input: ProjectInput | null;
-  analysis: any | null;
-  shots: Shot[];
-  packs: Packs | null;
+  package: ProductionPackage | null;
   mjPrompts: MJPrompt[];
   isGenerating: boolean;
   error: string | null;
@@ -27,9 +25,7 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 export function AppProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AppState>({
     input: null,
-    analysis: null,
-    shots: [],
-    packs: null,
+    package: null,
     mjPrompts: [],
     isGenerating: false,
     error: null,
@@ -40,66 +36,30 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setState((prev) => ({ ...prev, isGenerating: true, error: null, isComplete: false }));
     
     try {
-      // Step 1: Analyze script
-      const page1Res = await fetch('/api/page1', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ script: newInput.script }),
-      });
-      if (!page1Res.ok) throw new Error('Failed to analyze script');
-      const analysis = await page1Res.json();
-
-      // Step 2: Generate shots
-      const page2Res = await fetch('/api/page2', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ analysis, input: newInput }),
-      });
-      if (!page2Res.ok) throw new Error('Failed to generate shots');
-      const shotsData = await page2Res.json();
-      console.log('Shots API response:', shotsData);
+      const numShots = Math.round(newInput.duration * 0.75);
       
-      const shots = shotsData.shots || [];
-
-      // Step 3: Generate packs
-      const page3Res = await fetch('/api/page3', {
+      // Generate complete package in one API call
+      const response = await fetch('/api/generate-package', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ shots, input: newInput }),
+        body: JSON.stringify({ 
+          input: newInput,
+          numShots 
+        }),
       });
-      if (!page3Res.ok) throw new Error('Failed to generate packs');
-      const packsData = await page3Res.json();
-      console.log('Packs API response:', packsData);
       
-      const packs = {
-        shots: packsData.shots || shots,
-        packs: packsData.packs || []
-      };
-
-      // Step 4: Generate MJ prompts
-      const page4Res = await fetch('/api/page4', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ packs, input: newInput }),
-      });
-      if (!page4Res.ok) throw new Error('Failed to generate MJ prompts');
-      const mjData = await page4Res.json();
-      console.log('MJ Prompts API response:', mjData);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to generate package');
+      }
       
-      const mjPrompts = mjData.prompts || [];
-
-      console.log('Final data:', { 
-        shotsCount: shots.length, 
-        packsCount: packs.packs.length, 
-        mjCount: mjPrompts.length 
-      });
+      const data = await response.json();
+      console.log('Package generated:', data);
 
       setState({
         input: newInput,
-        analysis,
-        shots,
-        packs,
-        mjPrompts,
+        package: data.package,
+        mjPrompts: data.mjPrompts,
         isGenerating: false,
         error: null,
         isComplete: true,
@@ -114,12 +74,197 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const generatePackageContent = (): string => {
+    if (!state.package || !state.input) return '';
+    
+    const { input, package: pkg } = state;
+    const date = new Date().toLocaleDateString();
+    
+    let content = `================================================================================
+                    COMPLETE PRODUCTION PACKAGE
+================================================================================
+
+PROJECT: ${input.title}
+DURATION: ${input.duration} seconds
+ASPECT RATIO: ${input.aspectRatio}
+DATE: ${date}
+
+================================================================================
+                              ORIGINAL SCRIPT
+================================================================================
+
+${input.script}
+
+================================================================================
+                         SHOT BREAKDOWN (${pkg.shots.length} SHOTS)
+================================================================================
+
+`;
+    
+    pkg.shots.forEach((shot, i) => {
+      content += `
+SHOT ${shot.shotNumber}
+Timestamp: ${shot.timestamp}
+Framing: ${shot.framing}
+Lens: ${shot.lens}
+Movement: ${shot.movement}
+Duration: ${shot.duration}
+Description: ${shot.description}
+Lighting: ${shot.lighting}
+
+`;
+    });
+
+    // Character Packs
+    if (pkg.characters && pkg.characters.length > 0) {
+      content += `================================================================================
+                         CHARACTER PACKS
+================================================================================
+
+`;
+      pkg.characters.forEach((char) => {
+        content += `
+CHARACTER: ${char.character.name}
+Age Range: ${char.character.ageRange}
+Look: ${char.character.look}
+MJ Portrait Prompt: ${char.character.mjPortraitPrompt}
+
+`;
+      });
+    }
+
+    // Environment Packs
+    if (pkg.environments && pkg.environments.length > 0) {
+      content += `================================================================================
+                         ENVIRONMENT PACKS
+================================================================================
+
+`;
+      pkg.environments.forEach((env) => {
+        content += `
+SETTING: ${env.setting}
+Time of Day: ${env.timeOfDay}
+Lighting Setup: ${env.lightingSetup}
+Atmosphere: ${env.atmosphere}
+
+`;
+      });
+    }
+
+    // Costume Packs
+    if (pkg.characters && pkg.characters.length > 0) {
+      content += `================================================================================
+                         COSTUME PACKS
+================================================================================
+
+`;
+      pkg.characters.forEach((char) => {
+        content += `
+CHARACTER: ${char.character.name}
+Outfit: ${char.outfit}
+Materials: ${char.materials}
+Condition: ${char.condition}
+
+`;
+      });
+    }
+
+    // MJ Prompts
+    if (state.mjPrompts && state.mjPrompts.length > 0) {
+      content += `================================================================================
+                      MIDJOURNEY PROMPTS (${state.mjPrompts.length} PROMPTS)
+================================================================================
+
+`;
+      state.mjPrompts.forEach((prompt) => {
+        content += `
+--------------------------------------------------------------------------------
+SHOT ${prompt.shotNumber}: ${prompt.shotDescription}
+--------------------------------------------------------------------------------
+
+FIRST FRAME:
+${prompt.firstFrame}
+
+ENVIRONMENT:
+Country: ${prompt.environment.country}
+City: ${prompt.environment.city}
+Exact setting: ${prompt.environment.exactSetting}
+Time of day: ${prompt.environment.timeOfDay}
+Weather: ${prompt.environment.weather}
+Ambient details: ${prompt.environment.ambientDetails}
+
+SUBJECT:
+Primary subject: ${prompt.subject.primarySubject}
+Name: ${prompt.subject.name}
+Age range: ${prompt.subject.ageRange}
+Gender: ${prompt.subject.gender}
+Ethnicity: ${prompt.subject.ethnicity}
+Skin: ${prompt.subject.skin}
+Face: ${prompt.subject.face}
+Body type: ${prompt.subject.bodyType}
+
+HAIR:
+Hair style: ${prompt.hair.hairStyle}
+Hair color: ${prompt.hair.hairColor}
+Hair texture: ${prompt.hair.hairTexture}
+Hair condition: ${prompt.hair.hairCondition}
+Lighting on hair: ${prompt.hair.lightingOnHair}
+
+COSTUME:
+Full outfit description: ${prompt.costume.fullOutfitDescription}
+Colors: ${prompt.costume.colors}
+Materials: ${prompt.costume.materials}
+Fit: ${prompt.costume.fit}
+Condition: ${prompt.costume.condition}
+Accessories: ${prompt.costume.accessories}
+
+ACTION:
+Primary action: ${prompt.action.primaryAction}
+Body language: ${prompt.action.bodyLanguage}
+Micro-expressions: ${prompt.action.microExpressions}
+Interaction: ${prompt.action.interaction}
+
+MOOD:
+Emotional tone: ${prompt.mood.emotionalTone}
+Atmosphere: ${prompt.mood.atmosphere}
+Narrative context: ${prompt.mood.narrativeContext}
+Viewer feeling: ${prompt.mood.viewerFeeling}
+
+CINEMATOGRAPHY:
+DoP inspired by: ${prompt.cinematography.dopInspiredBy}
+Style: ${prompt.cinematography.style}
+Camera: ${prompt.cinematography.camera}
+Focal length: ${prompt.cinematography.focalLength}
+Aperture: ${prompt.cinematography.aperture}
+Lighting setup: ${prompt.cinematography.lightingSetup}
+Color grading: ${prompt.cinematography.colorGrading}
+Film grain: ${prompt.cinematography.filmGrain}
+Aspect ratio: ${prompt.cinematography.aspectRatio}
+${prompt.fullPrompt}
+
+PARAMETERS: ${prompt.parameters}
+NEGATIVES: ${prompt.negatives}
+
+
+`;
+      });
+    }
+
+    content += `================================================================================
+                              END OF PACKAGE
+================================================================================
+`;
+    
+    return content;
+  };
+
   const downloadTxt = () => {
     if (!state.mjPrompts || state.mjPrompts.length === 0) {
       alert('No MJ prompts to download');
       return;
     }
-    const content = state.mjPrompts.map((p) => p.prompt).join('\n\n---\n\n');
+    
+    const content = state.mjPrompts.map((p) => p.fullPrompt).join('\n\n================================================================================\n\n');
     const blob = new Blob([content], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -132,16 +277,27 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   const downloadDoc = () => {
-    if (!state.mjPrompts || state.mjPrompts.length === 0) {
-      alert('No MJ prompts to download');
+    if (!state.package || state.package.shots.length === 0) {
+      alert('No shots to download');
       return;
     }
-    const content = state.mjPrompts.map((p, i) => `Shot ${i + 1}: ${p.shotName}\n\n${p.prompt}\n\n`).join('---\n\n');
-    const blob = new Blob([content], { type: 'application/msword' });
+    
+    let content = `SHOT LIST - ${state.input?.title || 'Untitled'}\n`;
+    content += `Duration: ${state.input?.duration}s | Aspect Ratio: ${state.input?.aspectRatio}\n\n`;
+    
+    state.package.shots.forEach((shot) => {
+      content += `SHOT ${shot.shotNumber}\n`;
+      content += `Timestamp: ${shot.timestamp} | Duration: ${shot.duration}\n`;
+      content += `Framing: ${shot.framing} | Lens: ${shot.lens} | Movement: ${shot.movement}\n`;
+      content += `Description: ${shot.description}\n`;
+      content += `Lighting: ${shot.lighting}\n\n`;
+    });
+    
+    const blob = new Blob([content], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${state.input?.title || 'project'}_mj_prompts.doc`;
+    a.download = `${state.input?.title || 'project'}_shot_list.txt`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -149,52 +305,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   const downloadCompletePackage = () => {
-    if (!state.packs || !state.shots.length) {
+    const content = generatePackageContent();
+    if (!content) {
       alert('No data to download');
       return;
     }
     
-    let content = `PRODUCTION PACKAGE\n`;
-    content += `==================\n\n`;
-    content += `Title: ${state.input?.title || 'Untitled'}\n`;
-    content += `Director: ${state.input?.director || 'TBD'}\n`;
-    content += `Cinematographer: ${state.input?.cinematographer || 'TBD'}\n\n`;
-    
-    content += `SHOTS (${state.shots.length})\n`;
-    content += `=====\n\n`;
-    state.shots.forEach((shot, i) => {
-      content += `${i + 1}. ${shot.name || 'Unnamed Shot'}\n`;
-      content += `   Location: ${shot.location || 'N/A'}\n`;
-      content += `   Characters: ${shot.characters?.join(', ') || 'N/A'}\n`;
-      content += `   Time: ${shot.timeOfDay || 'N/A'}\n`;
-      content += `   Description: ${shot.description || 'N/A'}\n\n`;
-    });
-
-    if (state.packs.packs && state.packs.packs.length > 0) {
-      content += `\nPRODUCTION PACKS (${state.packs.packs.length})\n`;
-      content += `================\n\n`;
-      state.packs.packs.forEach((pack, i) => {
-        content += `Pack ${i + 1}: ${pack.name || 'Unnamed Pack'}\n`;
-        content += `Shots: ${pack.shots?.join(', ') || 'N/A'}\n`;
-        content += `Location: ${pack.location || 'N/A'}\n`;
-        content += `Requirements: ${pack.requirements?.join(', ') || 'N/A'}\n\n`;
-      });
-    }
-
-    if (state.mjPrompts.length > 0) {
-      content += `\nMIDJOURNEY PROMPTS (${state.mjPrompts.length})\n`;
-      content += `==================\n\n`;
-      state.mjPrompts.forEach((prompt, i) => {
-        content += `Shot ${i + 1}: ${prompt.shotName || 'Unnamed'}\n`;
-        content += `${prompt.prompt || 'No prompt'}\n\n`;
-      });
-    }
-
-    const blob = new Blob([content], { type: 'application/msword' });
+    const blob = new Blob([content], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${state.input?.title || 'project'}_complete_package.doc`;
+    a.download = `${state.input?.title || 'project'}_complete_package.txt`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -204,9 +325,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const reset = () => {
     setState({
       input: null,
-      analysis: null,
-      shots: [],
-      packs: null,
+      package: null,
       mjPrompts: [],
       isGenerating: false,
       error: null,
