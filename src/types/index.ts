@@ -9,6 +9,15 @@ export interface ReferenceUpload {
   uploadedAt: Date;
 }
 
+export interface ReferenceMetadata {
+  id: string;
+  type: 'image' | 'document';
+  fileName: string;
+  fileSize: number;
+  comment: string;
+  category: 'cast' | 'costume' | 'environment' | 'mood' | 'lighting' | 'other';
+}
+
 export interface ProjectInput {
   title: string;
   director: string;
@@ -16,7 +25,7 @@ export interface ProjectInput {
   duration: number;
   aspectRatio: string;
   script: string;
-  references: ReferenceUpload[];
+  references: ReferenceMetadata[];
   visualStyleNotes: string;
 }
 
