@@ -40,6 +40,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setState((prev) => ({ ...prev, isGenerating: true, error: null, isComplete: false }));
     
     try {
+      // Step 1: Analyze script
       const page1Res = await fetch('/api/page1', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -48,14 +49,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (!page1Res.ok) throw new Error('Failed to analyze script');
       const analysis = await page1Res.json();
 
+      // Step 2: Generate shots
       const page2Res = await fetch('/api/page2', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ analysis, input: newInput }),
       });
       if (!page2Res.ok) throw new Error('Failed to generate shots');
-      const shots = await page2Res.json();
+      const shotsData = await page2Res.json();
+      const shots = Array.isArray(shotsData) ? shotsData : shotsData.shots || [];
 
+      // Step 3: Generate packs
       const page3Res = await fetch('/api/page3', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -64,13 +68,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (!page3Res.ok) throw new Error('Failed to generate packs');
       const packs = await page3Res.json();
 
+      // Step 4: Generate MJ prompts
       const page4Res = await fetch('/api/page4', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ packs, input: newInput }),
       });
       if (!page4Res.ok) throw new Error('Failed to generate MJ prompts');
-      const mjPrompts = await page4Res.json();
+      const mjData = await page4Res.json();
+      const mjPrompts = Array.isArray(mjData) ? mjData : mjData.prompts || [];
+
+      console.log('Generation complete!', { shots, packs, mjPrompts });
 
       setState({
         input: newInput,
@@ -83,6 +91,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         isComplete: true,
       });
     } catch (err: any) {
+      console.error('Generation error:', err);
       setState((prev) => ({
         ...prev,
         isGenerating: false,
