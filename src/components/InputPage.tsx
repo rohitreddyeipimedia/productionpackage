@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { Film, Clock, Maximize, FileText, User, Camera, Palette, Image as ImageIcon, Loader2 } from 'lucide-react';
 import { ReferenceUploader } from './ReferenceUploader';
-import { ProjectInput, ReferenceUpload } from '@/types';
+import { ReferenceUpload } from '@/types';
 import { useApp } from '@/lib/store';
 
 export function InputPage() {
@@ -16,26 +16,26 @@ export function InputPage() {
     duration: '',
     aspectRatio: '16:9',
     script: '',
+    visualStyleNotes: '',
   });
   
   const [references, setReferences] = useState<ReferenceUpload[]>([]);
-  const [visualStyleNotes, setVisualStyleNotes] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    const input: ProjectInput = {
-      title: formData.title,
-      director: formData.director,
-      cinematographer: formData.cinematographer,
-      duration: parseInt(formData.duration) || 0,
-      aspectRatio: formData.aspectRatio,
-      script: formData.script,
-      references: references,
-      visualStyleNotes: visualStyleNotes,
-    };
-
-    await submitInput(input);
+    await submitInput(
+      {
+        title: formData.title,
+        director: formData.director,
+        cinematographer: formData.cinematographer,
+        duration: parseInt(formData.duration) || 0,
+        aspectRatio: formData.aspectRatio,
+        script: formData.script,
+        visualStyleNotes: formData.visualStyleNotes,
+      },
+      references
+    );
   };
 
   const isValid = formData.title && formData.duration && formData.script && parseInt(formData.duration) > 0;
@@ -49,7 +49,6 @@ export function InputPage() {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-8">
-          {/* Basic Info */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
             <h2 className="text-xl font-semibold text-gray-900 mb-6 flex items-center gap-2">
               <Film className="w-5 h-5 text-purple-600" />
@@ -124,7 +123,6 @@ export function InputPage() {
             </div>
           </div>
 
-          {/* Visual References Section */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
             <h2 className="text-xl font-semibold text-gray-900 mb-2 flex items-center gap-2">
               <ImageIcon className="w-5 h-5 text-purple-600" />
@@ -146,16 +144,15 @@ export function InputPage() {
                 Overall Visual Direction
               </label>
               <textarea
-                value={visualStyleNotes}
-                onChange={(e) => setVisualStyleNotes(e.target.value)}
-                placeholder="Additional notes about visual style, specific requirements, or references for GPT to consider (e.g., 'Use Roger Deakins lighting style', 'Muted color palette like Blade Runner 2049')..."
+                value={formData.visualStyleNotes}
+                onChange={(e) => setFormData({ ...formData, visualStyleNotes: e.target.value })}
+                placeholder="Additional notes about visual style, specific requirements, or references for GPT to consider..."
                 className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-purple-400 focus:ring-2 focus:ring-purple-100 transition-all resize-none"
                 rows={3}
               />
             </div>
           </div>
 
-          {/* Screenplay */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
             <h2 className="text-xl font-semibold text-gray-900 mb-6 flex items-center gap-2">
               <FileText className="w-5 h-5 text-purple-600" />
@@ -164,24 +161,12 @@ export function InputPage() {
             <textarea
               value={formData.script}
               onChange={(e) => setFormData({ ...formData, script: e.target.value })}
-              placeholder="Paste your screenplay here...
-              
-Format example:
-INT. COFFEE SHOP - DAY
-
-JOHN (30s) sits at a corner table, nursing a cold cup of coffee. He checks his watch nervously.
-
-JOHN
-(whispering to himself)
-She's never late.
-
-SARAH (20s, business attire) enters, scanning the room."
+              placeholder="Paste your screenplay here..."
               className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-purple-400 focus:ring-2 focus:ring-purple-100 transition-all resize-none font-mono text-sm"
               rows={15}
             />
           </div>
 
-          {/* Submit */}
           <div className="flex flex-col items-center gap-4">
             <button
               type="submit"
