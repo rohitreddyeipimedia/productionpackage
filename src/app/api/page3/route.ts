@@ -20,9 +20,8 @@ Create packs where:
 - Packs are organized logically for shooting
 - Include equipment and personnel requirements
 
-Return as JSON:
+Return as JSON object with "packs" array:
 {
-  "shots": [...original shots...],
   "packs": [
     {
       "id": "unique-id",
@@ -41,16 +40,22 @@ Return as JSON:
     });
 
     const content = completion.choices[0].message.content;
-    const packs = JSON.parse(content || '{}');
-
-    if (packs.packs) {
-      packs.packs = packs.packs.map((pack: any) => ({
-        ...pack,
-        id: pack.id || generateUUID(),
-      }));
+    const parsed = JSON.parse(content || '{}');
+    
+    // Extract packs array from response
+    let packs: any[] = [];
+    if (parsed.packs && Array.isArray(parsed.packs)) {
+      packs = parsed.packs;
+    } else if (Array.isArray(parsed)) {
+      packs = parsed;
     }
 
-    return NextResponse.json(packs);
+    const packsWithIds = packs.map((pack: any) => ({
+      ...pack,
+      id: pack.id || generateUUID(),
+    }));
+
+    return NextResponse.json({ shots, packs: packsWithIds });
   } catch (error: any) {
     console.error('Page 3 error:', error);
     return NextResponse.json(
