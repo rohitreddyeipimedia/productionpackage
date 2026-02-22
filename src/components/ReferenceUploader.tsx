@@ -304,32 +304,4 @@ export function ReferenceUploader({ references, onChange }: ReferenceUploaderPro
                             {ref.comment ? 'Re-analyze' : 'Analyze with AI'}
                           </>
                         )}
-                      </button>
-                    )}
-                  </div>
-                  
-                  <textarea
-                    value={ref.comment}
-                    onChange={(e) => updateReference(ref.id, { comment: e.target.value })}
-                    placeholder={ref.type === 'image' 
-                      ? "AI will auto-describe this image, or type your own notes..." 
-                      : "Describe what GPT should know from this document..."
-                    }
-                    className="w-full text-sm border border-gray-200 rounded-lg p-2 focus:outline-none focus:border-purple-400 focus:ring-2 focus:ring-purple-100 resize-none"
-                    rows={3}
-                  />
-                  
-                  {!ref.comment && ref.type === 'image' && !process.env.NEXT_PUBLIC_OPENAI_API_KEY && (
-                    <p className="text-xs text-orange-600 mt-1">
-                      ⚠️ Add NEXT_PUBLIC_OPENAI_API_KEY to .env.local for auto-analysis
-                    </p>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
+                      </
