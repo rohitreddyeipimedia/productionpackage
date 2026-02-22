@@ -40,46 +40,76 @@ export function AppProvider({ children }: { children: ReactNode }) {
       isGenerating: true, 
       error: null, 
       isComplete: false,
-      progressMessage: 'Analyzing script and generating shots...'
+      progressMessage: 'Generating shots...'
     }));
     
     try {
       const numShots = Math.round(newInput.duration * 0.75);
+      const shotBatchSize = 10; // Generate shots in batches of 10
       
-      // Step 1: Generate shots, characters, environments
-      const shotsResponse = await fetch('/api/generate-shots', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          input: newInput,
-          numShots 
-        }),
-      });
+      // Step 1: Generate shots in batches
+      const allShots: Shot[] = [];
+      const allCharacters: any[] = [];
+      const allEnvironments: any[] = [];
       
-      if (!shotsResponse.ok) {
-        const errorData = await shotsResponse.json();
-        throw new Error(errorData.error || 'Failed to generate shots');
+      for (let i = 0; i < numShots; i += shotBatchSize) {
+        const batchNum = Math.floor(i / shotBatchSize) + 1;
+        const totalBatches = Math.ceil(numShots / shotBatchSize);
+        const shotsToGenerate = Math.min(shotBatchSize, numShots - i);
+        
+        setState((prev) => ({ 
+          ...prev, 
+          progressMessage: `Generating shots batch ${batchNum}/${totalBatches}...`
+        }));
+        
+        const shotsResponse = await fetch('/api/generate-shots', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            input: newInput,
+            numShots: shotsToGenerate,
+            startIndex: i,
+            totalShots: numShots
+          }),
+        });
+        
+        if (!shotsResponse.ok) {
+          const errorData = await shotsResponse.json();
+          throw new Error(errorData.error || `Failed to generate shots batch ${batchNum}`);
+        }
+        
+        const shotsData = await shotsResponse.json();
+        
+        // Adjust shot numbers to be sequential
+        const batchShots = (shotsData.shots || []).map((s: any, idx: number) => ({
+          ...s,
+          shotNumber: i + idx + 1
+        }));
+        
+        allShots.push(...batchShots);
+        
+        // Only take characters and environments from first batch
+        if (i === 0) {
+          allCharacters.push(...(shotsData.characters || []));
+          allEnvironments.push(...(shotsData.environments || []));
+        }
+        
+        // Small delay between batches
+        await new Promise(resolve => setTimeout(resolve, 300));
       }
-      
-      const shotsData = await shotsResponse.json();
-      console.log('Shots generated:', shotsData);
-      
-      const shots: Shot[] = shotsData.shots || [];
-      const characters = shotsData.characters || [];
-      const environments = shotsData.environments || [];
-      
-      if (shots.length === 0) {
+
+      if (allShots.length === 0) {
         throw new Error('No shots were generated');
       }
 
       // Step 2: Generate MJ prompts in batches of 3
-      const batchSize = 3;
+      const mjBatchSize = 3;
       const allMjPrompts: MJPrompt[] = [];
       
-      for (let i = 0; i < shots.length; i += batchSize) {
-        const batch = shots.slice(i, i + batchSize);
-        const batchNum = Math.floor(i / batchSize) + 1;
-        const totalBatches = Math.ceil(shots.length / batchSize);
+      for (let i = 0; i < allShots.length; i += mjBatchSize) {
+        const batch = allShots.slice(i, i + mjBatchSize);
+        const batchNum = Math.floor(i / mjBatchSize) + 1;
+        const totalBatches = Math.ceil(allShots.length / mjBatchSize);
         
         setState((prev) => ({ 
           ...prev, 
@@ -91,8 +121,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
             shots: batch,
-            characters,
-            environments,
+            characters: allCharacters,
+            environments: allEnvironments,
             input: newInput,
             startIndex: i
           }),
@@ -110,14 +140,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
         await new Promise(resolve => setTimeout(resolve, 500));
       }
 
-      console.log('All MJ prompts generated:', allMjPrompts.length);
+      console.log('All generated:', { shots: allShots.length, mjPrompts: allMjPrompts.length });
 
       setState({
         input: newInput,
         package: {
-          shots,
-          characters,
-          environments,
+          shots: allShots,
+          characters: allCharacters,
+          environments: allEnvironments,
         },
         mjPrompts: allMjPrompts,
         isGenerating: false,
@@ -414,6 +444,4 @@ NEGATIVES: ${prompt.negatives}
 
 export const useApp = () => {
   const context = useContext(AppContext);
-  if (!context) throw new Error('useApp must be used within AppProvider');
-  return context;
-};
+  if (!context) throw new Error('useApp must be used within App
