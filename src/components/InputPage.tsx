@@ -10,6 +10,7 @@ export default function InputPage() {
     isGenerating,
     error,
     isComplete,
+    progressMessage,
     downloadTxt,
     downloadDoc,
     downloadCompletePackage,
@@ -33,7 +34,6 @@ export default function InputPage() {
     if (!formData.script.trim()) return;
     
     const durationNum = parseInt(formData.duration) || 30;
-    const estimatedShots = Math.round(durationNum * 0.75);
     
     await submitInput({
       title: formData.title || 'Untitled Project',
@@ -232,7 +232,7 @@ export default function InputPage() {
             {isGenerating ? (
               <>
                 <Loader2 className="w-5 h-5 animate-spin" />
-                Generating Production Package...
+                {progressMessage || 'Generating...'}
               </>
             ) : (
               <>
@@ -242,23 +242,11 @@ export default function InputPage() {
             )}
           </button>
 
-          {isGenerating && (
-            <div className="bg-white/5 rounded-xl p-6 space-y-3">
+          {isGenerating && progressMessage && (
+            <div className="bg-white/5 rounded-xl p-4">
               <div className="flex items-center gap-3 text-white/60">
                 <Loader2 className="w-4 h-4 animate-spin" />
-                <span className="text-sm">Analyzing script structure...</span>
-              </div>
-              <div className="flex items-center gap-3 text-white/40">
-                <div className="w-4 h-4 rounded-full border-2 border-white/20" />
-                <span className="text-sm">Generating shot breakdown...</span>
-              </div>
-              <div className="flex items-center gap-3 text-white/40">
-                <div className="w-4 h-4 rounded-full border-2 border-white/20" />
-                <span className="text-sm">Creating character & environment packs...</span>
-              </div>
-              <div className="flex items-center gap-3 text-white/40">
-                <div className="w-4 h-4 rounded-full border-2 border-white/20" />
-                <span className="text-sm">Building detailed MJ prompts...</span>
+                <span className="text-sm">{progressMessage}</span>
               </div>
             </div>
           )}
