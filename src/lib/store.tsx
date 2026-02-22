@@ -59,17 +59,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const shotsData = await page2Res.json();
       console.log('Shots API response:', shotsData);
       
-      // Handle different response formats
-      let shots: Shot[] = [];
-      if (Array.isArray(shotsData)) {
-        shots = shotsData;
-      } else if (shotsData.shots && Array.isArray(shotsData.shots)) {
-        shots = shotsData.shots;
-      } else if (typeof shotsData === 'object') {
-        // Try to find array in response
-        const possibleArray = Object.values(shotsData).find(v => Array.isArray(v));
-        if (possibleArray) shots = possibleArray as Shot[];
-      }
+      const shots = shotsData.shots || [];
 
       // Step 3: Generate packs
       const page3Res = await fetch('/api/page3', {
@@ -81,15 +71,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const packsData = await page3Res.json();
       console.log('Packs API response:', packsData);
       
-      // Handle packs response
-      let packs: Packs = { shots: shots, packs: [] };
-      if (packsData && typeof packsData === 'object') {
-        if (packsData.packs && Array.isArray(packsData.packs)) {
-          packs = packsData;
-        } else if (Array.isArray(packsData)) {
-          packs = { shots: shots, packs: packsData };
-        }
-      }
+      const packs = {
+        shots: packsData.shots || shots,
+        packs: packsData.packs || []
+      };
 
       // Step 4: Generate MJ prompts
       const page4Res = await fetch('/api/page4', {
@@ -101,20 +86,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const mjData = await page4Res.json();
       console.log('MJ Prompts API response:', mjData);
       
-      // Handle MJ prompts response
-      let mjPrompts: MJPrompt[] = [];
-      if (Array.isArray(mjData)) {
-        mjPrompts = mjData;
-      } else if (mjData.prompts && Array.isArray(mjData.prompts)) {
-        mjPrompts = mjData.prompts;
-      } else if (mjData.mjPrompts && Array.isArray(mjData.mjPrompts)) {
-        mjPrompts = mjData.mjPrompts;
-      } else if (typeof mjData === 'object') {
-        const possibleArray = Object.values(mjData).find(v => Array.isArray(v));
-        if (possibleArray) mjPrompts = possibleArray as MJPrompt[];
-      }
+      const mjPrompts = mjData.prompts || [];
 
-      console.log('Final data:', { shotsCount: shots.length, packsCount: packs.packs.length, mjCount: mjPrompts.length });
+      console.log('Final data:', { 
+        shotsCount: shots.length, 
+        packsCount: packs.packs.length, 
+        mjCount: mjPrompts.length 
+      });
 
       setState({
         input: newInput,
