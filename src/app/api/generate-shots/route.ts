@@ -9,6 +9,18 @@ export async function POST(req: NextRequest) {
   try {
     const { input, numShots, startIndex, totalShots } = await req.json();
 
+    // Build visual context from references
+    let visualContext = 'No visual references provided.';
+    if (input.references && input.references.length > 0) {
+      visualContext = input.references.map((ref: any) => {
+        return `[${ref.category.toUpperCase()} REFERENCE: ${ref.fileName}]
+User Context: "${ref.comment}"
+Type: ${ref.type}`;
+      }).join('\n\n');
+    }
+
+    const visualNotes = input.visualStyleNotes || 'No additional visual notes.';
+
     const prompt = `You are a professional film production assistant. Create ${numShots} shots for this screenplay.
 
 PROJECT DETAILS:
@@ -17,6 +29,19 @@ PROJECT DETAILS:
 - Aspect Ratio: ${input.aspectRatio}
 - This is batch starting at shot ${startIndex + 1} of ${totalShots} total shots
 - Generate shots ${startIndex + 1} to ${startIndex + numShots}
+
+CRITICAL VISUAL REFERENCES PROVIDED BY USER:
+${visualContext}
+
+OVERALL VISUAL DIRECTION:
+${visualNotes}
+
+You MUST incorporate these visual references:
+- For CAST references: Match physical traits, age range, and look described in the comments
+- For COSTUME references: Use the specific clothing, materials, and style mentioned
+- For ENVIRONMENT references: Match the location type, lighting, and atmosphere
+- For MOOD references: Capture the emotional tone and visual style
+- For LIGHTING references: Replicate the lighting setup described
 
 SCREENPLAY:
 ${input.script}
@@ -42,20 +67,20 @@ Generate exactly ${numShots} shots. Return as JSON:
       "character": {
         "name": "Character Name",
         "ageRange": "30-40",
-        "look": "Description",
-        "mjPortraitPrompt": "Midjourney portrait prompt"
+        "look": "Description matching any cast references provided",
+        "mjPortraitPrompt": "Midjourney portrait prompt incorporating cast reference details"
       },
-      "outfit": "Clothing description",
-      "materials": "Fabric materials",
+      "outfit": "Clothing description matching any costume references",
+      "materials": "Fabric materials from references",
       "condition": "Condition"
     }
   ],
   "environments": [
     {
-      "setting": "Setting name",
+      "setting": "Setting name matching environment references",
       "timeOfDay": "Time",
-      "lightingSetup": "Lighting",
-      "atmosphere": "Atmosphere"
+      "lightingSetup": "Lighting matching references",
+      "atmosphere": "Atmosphere matching mood references"
     }
   ]
 }
@@ -64,7 +89,8 @@ IMPORTANT:
 1. Generate EXACTLY ${numShots} shots in this batch
 2. Timestamps should be distributed across the film duration
 3. Keep descriptions concise but detailed
-4. Include characters and environments only if startIndex is 0`;
+4. Incorporate specific details from visual references into descriptions
+5. Include characters and environments only if startIndex is 0`;
 
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o',
@@ -74,12 +100,11 @@ IMPORTANT:
     });
 
     const content = completion.choices[0].message.content;
-    
+
     if (!content) {
       throw new Error('Empty response from OpenAI');
     }
-    
-    // Validate JSON
+
     try {
       const data = JSON.parse(content);
       return NextResponse.json(data);
