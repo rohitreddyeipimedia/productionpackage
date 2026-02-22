@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, ReactNode } from 'react';
-import { ProjectInput, ProductionPackage, MJPrompt } from '@/types';
+import { ProjectInput, ProductionPackage, MJPrompt, Shot } from '@/types';
 
 interface AppState {
   input: ProjectInput | null;
@@ -10,6 +10,7 @@ interface AppState {
   isGenerating: boolean;
   error: string | null;
   isComplete: boolean;
+  progressMessage: string;
 }
 
 interface AppContextType extends AppState {
@@ -30,16 +31,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
     isGenerating: false,
     error: null,
     isComplete: false,
+    progressMessage: '',
   });
 
   const submitInput = async (newInput: ProjectInput) => {
-    setState((prev) => ({ ...prev, isGenerating: true, error: null, isComplete: false }));
+    setState((prev) => ({ 
+      ...prev, 
+      isGenerating: true, 
+      error: null, 
+      isComplete: false,
+      progressMessage: 'Analyzing script and generating shots...'
+    }));
     
     try {
       const numShots = Math.round(newInput.duration * 0.75);
       
-      // Generate complete package in one API call
-      const response = await fetch('/api/generate-package', {
+      // Step 1: Generate shots, characters, environments
+      const shotsResponse = await fetch('/api/generate-shots', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -48,21 +56,74 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }),
       });
       
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to generate package');
+      if (!shotsResponse.ok) {
+        const errorData = await shotsResponse.json();
+        throw new Error(errorData.error || 'Failed to generate shots');
       }
       
-      const data = await response.json();
-      console.log('Package generated:', data);
+      const shotsData = await shotsResponse.json();
+      console.log('Shots generated:', shotsData);
+      
+      const shots: Shot[] = shotsData.shots || [];
+      const characters = shotsData.characters || [];
+      const environments = shotsData.environments || [];
+      
+      if (shots.length === 0) {
+        throw new Error('No shots were generated');
+      }
+
+      // Step 2: Generate MJ prompts in batches of 3
+      const batchSize = 3;
+      const allMjPrompts: MJPrompt[] = [];
+      
+      for (let i = 0; i < shots.length; i += batchSize) {
+        const batch = shots.slice(i, i + batchSize);
+        const batchNum = Math.floor(i / batchSize) + 1;
+        const totalBatches = Math.ceil(shots.length / batchSize);
+        
+        setState((prev) => ({ 
+          ...prev, 
+          progressMessage: `Generating MJ prompts batch ${batchNum}/${totalBatches}...`
+        }));
+        
+        const mjResponse = await fetch('/api/generate-mj-prompts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            shots: batch,
+            characters,
+            environments,
+            input: newInput,
+            startIndex: i
+          }),
+        });
+        
+        if (!mjResponse.ok) {
+          const errorData = await mjResponse.json();
+          throw new Error(errorData.error || `Failed to generate MJ prompts batch ${batchNum}`);
+        }
+        
+        const mjData = await mjResponse.json();
+        allMjPrompts.push(...(mjData.mjPrompts || []));
+        
+        // Small delay to avoid rate limiting
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+
+      console.log('All MJ prompts generated:', allMjPrompts.length);
 
       setState({
         input: newInput,
-        package: data.package,
-        mjPrompts: data.mjPrompts,
+        package: {
+          shots,
+          characters,
+          environments,
+        },
+        mjPrompts: allMjPrompts,
         isGenerating: false,
         error: null,
         isComplete: true,
+        progressMessage: '',
       });
     } catch (err: any) {
       console.error('Generation error:', err);
@@ -70,6 +131,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         ...prev,
         isGenerating: false,
         error: err.message || 'Something went wrong',
+        progressMessage: '',
       }));
     }
   };
@@ -101,7 +163,7 @@ ${input.script}
 
 `;
     
-    pkg.shots.forEach((shot, i) => {
+    pkg.shots.forEach((shot) => {
       content += `
 SHOT ${shot.shotNumber}
 Timestamp: ${shot.timestamp}
@@ -330,6 +392,7 @@ NEGATIVES: ${prompt.negatives}
       isGenerating: false,
       error: null,
       isComplete: false,
+      progressMessage: '',
     });
   };
 
