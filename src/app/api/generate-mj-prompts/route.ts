@@ -23,7 +23,6 @@ export async function POST(req: NextRequest) {
 SHOT ${startIndex + i + 1}:
 - Timestamp: ${s.timestamp}
 - Framing: ${s.framing}
-- Lens: ${s.lens}
 - Description: ${s.description}
 - Lighting: ${s.lighting}
 `).join('\n');
