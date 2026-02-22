@@ -1,3 +1,14 @@
+export interface ReferenceUpload {
+  id: string;
+  type: 'image' | 'document';
+  fileName: string;
+  fileUrl: string;
+  fileSize: number;
+  comment: string;
+  category: 'cast' | 'costume' | 'environment' | 'mood' | 'lighting' | 'other';
+  uploadedAt: Date;
+}
+
 export interface ProjectInput {
   title: string;
   director: string;
@@ -5,6 +16,8 @@ export interface ProjectInput {
   duration: number;
   aspectRatio: string;
   script: string;
+  references: ReferenceUpload[];
+  visualStyleNotes: string;
 }
 
 export interface Shot {
