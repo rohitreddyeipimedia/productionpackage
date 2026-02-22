@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, ReactNode } from 'react';
-import { ProjectInput, ProductionPackage, MJPrompt, Shot } from '@/types';
+import { ProjectInput, ProductionPackage, MJPrompt, Shot, ReferenceUpload, ReferenceMetadata } from '@/types';
 
 interface AppState {
   input: ProjectInput | null;
@@ -14,7 +14,7 @@ interface AppState {
 }
 
 interface AppContextType extends AppState {
-  submitInput: (input: ProjectInput) => Promise<void>;
+  submitInput: (formData: Omit<ProjectInput, 'references'>, references: ReferenceUpload[]) => Promise<void>;
   downloadTxt: () => void;
   downloadDoc: () => void;
   downloadCompletePackage: () => void;
@@ -34,7 +34,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
     progressMessage: '',
   });
 
-  const submitInput = async (newInput: ProjectInput) => {
+  const createMetadata = (references: ReferenceUpload[]): ReferenceMetadata[] => {
+    return references.map(ref => ({
+      id: ref.id,
+      type: ref.type,
+      fileName: ref.fileName,
+      fileSize: ref.fileSize,
+      comment: ref.comment,
+      category: ref.category,
+    }));
+  };
+
+  const submitInput = async (formData: Omit<ProjectInput, 'references'>, references: ReferenceUpload[]) => {
+    const lightweightInput: ProjectInput = {
+      ...formData,
+      references: createMetadata(references),
+    };
+
     setState((prev) => ({
       ...prev,
       isGenerating: true,
@@ -44,14 +60,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }));
 
     try {
-      const numShots = Math.round(newInput.duration * 0.75);
+      const numShots = Math.round(formData.duration * 0.75);
       const shotBatchSize = 10;
 
       const allShots: Shot[] = [];
       const allCharacters: any[] = [];
       const allEnvironments: any[] = [];
 
-      // Generate shots in batches
       for (let i = 0; i < numShots; i += shotBatchSize) {
         const batchNum = Math.floor(i / shotBatchSize) + 1;
         const totalBatches = Math.ceil(numShots / shotBatchSize);
@@ -66,12 +81,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            input: newInput,
+            input: lightweightInput,
             numShots: shotsToGenerate,
             startIndex: i,
             totalShots: numShots,
-            references: newInput.references,
-            visualStyleNotes: newInput.visualStyleNotes,
           }),
         });
 
@@ -101,7 +114,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
         throw new Error('No shots were generated');
       }
 
-      // Generate MJ prompts in batches
       const mjBatchSize = 3;
       const allMjPrompts: MJPrompt[] = [];
 
@@ -122,10 +134,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
             shots: batch,
             characters: allCharacters,
             environments: allEnvironments,
-            input: newInput,
+            input: lightweightInput,
             startIndex: i,
-            references: newInput.references,
-            visualStyleNotes: newInput.visualStyleNotes,
           }),
         });
 
@@ -141,7 +151,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
 
       setState({
-        input: newInput,
+        input: lightweightInput,
         package: {
           shots: allShots,
           characters: allCharacters,
@@ -182,17 +192,14 @@ ASPECT RATIO: ${input.aspectRatio}
 DATE: ${date}
 
 ================================================================================
- VISUAL REFERENCES
+ VISUAL REFERENCES (${input.references?.length || 0} files)
 ================================================================================
 
-Total References: ${input.references?.length || 0}
-${input.visualStyleNotes ? `Visual Direction: ${input.visualStyleNotes}` : ''}
-
+${input.visualStyleNotes ? `Visual Direction: ${input.visualStyleNotes}\n` : ''}
 ${input.references?.map((ref, idx) => `
 Reference ${idx + 1}: ${ref.fileName}
 Category: ${ref.category}
 Context: ${ref.comment}
-Type: ${ref.type}
 `).join('\n') || 'No visual references uploaded'}
 
 ================================================================================
@@ -254,23 +261,6 @@ Atmosphere: ${env.atmosphere}
       });
     }
 
-    if (pkg.characters && pkg.characters.length > 0) {
-      content += `================================================================================
- COSTUME PACKS
-================================================================================
-
-`;
-      pkg.characters.forEach((char) => {
-        content += `
-CHARACTER: ${char.character.name}
-Outfit: ${char.outfit}
-Materials: ${char.materials}
-Condition: ${char.condition}
-
-`;
-      });
-    }
-
     if (state.mjPrompts && state.mjPrompts.length > 0) {
       content += `================================================================================
  MIDJOURNEY PROMPTS (${state.mjPrompts.length} PROMPTS)
@@ -281,7 +271,7 @@ Condition: ${char.condition}
         content += `
 --------------------------------------------------------------------------------
 SHOT ${prompt.shotNumber}: ${prompt.shotDescription}
-
+--------------------------------------------------------------------------------
 
 FIRST FRAME:
 ${prompt.firstFrame}
